@@ -11,6 +11,7 @@ open class Sms() {
     var sim: String = ""
     var carrier: String = ""
     var sender: String = ""
+    var contactName: String = ""
     var timestamp: Long = 0
     var offset: Int = 0
 
@@ -20,6 +21,7 @@ open class Sms() {
         sim = sms.sim
         carrier = sms.carrier
         sender = sms.sender
+        contactName = sms.contactName
         timestamp = sms.timestamp
         offset = sms.offset
     }

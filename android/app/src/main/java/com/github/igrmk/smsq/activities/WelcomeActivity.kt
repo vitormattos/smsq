@@ -16,6 +16,7 @@ import com.github.igrmk.smsq.Constants
 import com.github.igrmk.smsq.R
 import com.github.igrmk.smsq.helpers.*
 import com.github.igrmk.smsq.services.ResenderService
+import com.github.igrmk.smsq.services.ReplyPollingService
 import kotlinx.android.synthetic.main.activity_welcome.*
 import android.provider.Telephony.Sms.Intents.SMS_RECEIVED_ACTION
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -74,6 +75,22 @@ class WelcomeActivity : AppCompatActivity() {
             checkShowCarrierSwitch()
         }
 
+        if (myPreferences.showContacts &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PERMISSION_GRANTED) {
+            myPreferences.showContacts = false
+        }
+        showContacts.isChecked = myPreferences.showContacts
+
+        if (myPreferences.replyEnabled &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PERMISSION_GRANTED) {
+            myPreferences.replyEnabled = false
+        }
+        enableSmsReplies.isChecked = myPreferences.replyEnabled
+        enableSmsReplies.isEnabled = myPreferences.on
+        if (myPreferences.on && myPreferences.replyEnabled) {
+            startReplyPolling()
+        }
+
         botIdText.setText(myPreferences.botName);
         urlText.setText(myPreferences.domainName);
         botIdText.isEnabled = !myPreferences.on;
@@ -121,6 +138,8 @@ class WelcomeActivity : AppCompatActivity() {
             updateKey()
         }
         this.startService(Intent(this, ResenderService::class.java))
+        enableSmsReplies.isEnabled = true
+        startReplyPolling()
     }
 
     private fun stop() {
@@ -129,6 +148,8 @@ class WelcomeActivity : AppCompatActivity() {
         connect.isEnabled = false
         start.text = getString(R.string.start)
         this.stopService(Intent(this, ResenderService::class.java))
+        this.stopService(Intent(this, ReplyPollingService::class.java))
+        enableSmsReplies.isEnabled = false
     }
 
     fun onStartClicked(@Suppress("UNUSED_PARAMETER") view: View) {
@@ -165,6 +186,9 @@ class WelcomeActivity : AppCompatActivity() {
     }
 
     private fun forceRevoke() {
+        myPreferences.replyEnabled = false
+        myPreferences.edit().remove(Constants.PREF_REPLY_ACKS).apply()
+        enableSmsReplies.isChecked = false
         revokeKey()
         revokeButton.isEnabled = false
         stop()
@@ -211,6 +235,62 @@ class WelcomeActivity : AppCompatActivity() {
         }
     }
 
+    private fun startReplyPolling() {
+        if (myPreferences.on && myPreferences.replyEnabled) {
+            ContextCompat.startForegroundService(this, Intent(this, ReplyPollingService::class.java))
+        }
+    }
+
+    fun onContactsClicked(@Suppress("UNUSED_PARAMETER") view: View) {
+        if (!showContacts.isChecked) {
+            myPreferences.showContacts = false
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PERMISSION_GRANTED) {
+            myPreferences.showContacts = true
+            return
+        }
+        ActivityCompat.requestPermissions(
+            this, arrayOf(Manifest.permission.READ_CONTACTS), Constants.PERMISSIONS_CONTACTS
+        )
+    }
+
+    private fun enableReplies() {
+        myPreferences.replyEnabled = true
+        enableSmsReplies.isChecked = true
+        startReplyPolling()
+    }
+
+    fun onRepliesClicked(@Suppress("UNUSED_PARAMETER") view: View) {
+        if (!enableSmsReplies.isChecked) {
+            myPreferences.replyEnabled = false
+            stopService(Intent(this, ReplyPollingService::class.java))
+            return
+        }
+        if (!myPreferences.domainName.startsWith("https://", ignoreCase = true)) {
+            enableSmsReplies.isChecked = false
+            AlertDialog.Builder(this)
+                .setMessage("SMS replies require an HTTPS backend URL.")
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setMessage("Telegram replies to forwarded SMS will send real text messages from this phone. Carrier charges may apply. Only your paired private Telegram account (or the configured group administrator) may send them. The phone will show a persistent notification while checking for replies.")
+            .setPositiveButton(android.R.string.yes) { _, _ ->
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PERMISSION_GRANTED) {
+                    enableReplies()
+                } else {
+                    ActivityCompat.requestPermissions(
+                        this, arrayOf(Manifest.permission.SEND_SMS), Constants.PERMISSIONS_SEND_SMS
+                    )
+                }
+            }
+            .setNegativeButton(android.R.string.no) { _, _ -> enableSmsReplies.isChecked = false }
+            .setOnCancelListener { enableSmsReplies.isChecked = false }
+            .show()
+    }
+
     private fun checkShowCarrierSwitch(): Boolean {
         if (myPreferences.showCarrier) {
             showCarrier.isChecked = true
@@ -244,6 +324,23 @@ class WelcomeActivity : AppCompatActivity() {
                     allowed()
                 } else {
                     stop()
+                }
+
+            Constants.PERMISSIONS_CONTACTS ->
+                if (grantResults.isNotEmpty() && grantResults.all { it == PERMISSION_GRANTED }) {
+                    showContacts.isChecked = true
+                    myPreferences.showContacts = true
+                } else {
+                    showContacts.isChecked = false
+                    myPreferences.showContacts = false
+                }
+
+            Constants.PERMISSIONS_SEND_SMS ->
+                if (grantResults.isNotEmpty() && grantResults.all { it == PERMISSION_GRANTED }) {
+                    enableReplies()
+                } else {
+                    enableSmsReplies.isChecked = false
+                    myPreferences.replyEnabled = false
                 }
 
             Constants.PERMISSIONS_STATE ->
