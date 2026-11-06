@@ -49,6 +49,13 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew testDebugUnitTest assembleDebug --no-daemon
+      - name: Upload debug APK for device testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: smsq-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
 
   build-and-push:
     needs: [go-tests, android-tests]
