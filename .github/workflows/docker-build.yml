@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - test/smsq-pr4-side-by-side
     tags:
       - 'v*'
   pull_request:
@@ -58,6 +59,7 @@ jobs:
           retention-days: 14
 
   build-and-push:
+    if: github.ref != 'refs/heads/test/smsq-pr4-side-by-side'
     needs: [go-tests, android-tests]
     runs-on: ubuntu-latest
     permissions:
