@@ -130,7 +130,7 @@ backend and the Android application. It is disabled by default.
 2. Enable **Allow SMS replies** in the Android application and grant the Android
    \`SEND_SMS\` permission. The application will display an ongoing notification
    while its foreground service checks the backend approximately once a minute.
-3. In Telegram, use **Reply** on a forwarded SMS message and type your response.
+3. In Telegram, use **Reply** on an SMS forwarded **after upgrading the backend** and type your response. Previously forwarded Telegram messages do not have a stored recipient mapping and cannot be answered through this feature.
    The bot queues the text for the number that sent that specific SMS. It cannot
    be redirected by editing the quoted message or typing a different number.
 4. The bot first confirms that the reply was queued, then reports whether Android
