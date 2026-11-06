@@ -249,6 +249,7 @@ func (w *worker) start(chatID int64, key string) {
 
 	existingChatID, _ := w.chatForKey(key)
 	if existingChatID != nil && *existingChatID != chatID {
+		w.mustExec("update users set deleted=1 where chat_id=?", *existingChatID)
 		_ = w.sendText(chatID, false, parseRaw, "Subscription on other Telegram account has been revoked")
 		_ = w.sendText(*existingChatID, false, parseRaw, "Your subscription has been revoked from other Telegram account")
 	}
