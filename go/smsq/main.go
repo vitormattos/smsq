@@ -704,15 +704,13 @@ func main() {
 		case s := <-w.deliverChan:
 			s.result <- w.deliver(s.sms)
 		case m := <-incoming:
+			// Telegram updates can contain outgoing SMS bodies. Never log
+			// their text, including when debug logging is enabled.
 			chatString := ""
 			if m.Message != nil && m.Message.Chat != nil {
-				chatString = fmt.Sprintf("chat: %d", m.Message.Chat.ID)
+				chatString = fmt.Sprintf("chat: %d, message: %d", m.Message.Chat.ID, m.Message.MessageID)
 			}
-			textString := ""
-			if m.Message != nil {
-				textString = fmt.Sprintf("text: %s", m.Message.Text)
-			}
-			linf(strings.Join([]string{"got TG update", chatString, textString}, ", "))
+			linf(strings.Join([]string{"got TG update", chatString}, ", "))
 			w.processTGUpdate(m)
 		case s := <-signals:
 			linf("got signal %v", s)
