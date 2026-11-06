@@ -48,7 +48,7 @@ class RestTalker(val logger: Logger, private val baseUrl: String, private val hy
         }
     }
 
-    private fun <U, T : BasicResponse<U>> readReply(
+    internal fun <U, T : BasicResponse<U>> readReply(
         serializer: DeserializationStrategy<T>, response: String?
     ): Pair<U?, Boolean> {
         if (response == null) {
