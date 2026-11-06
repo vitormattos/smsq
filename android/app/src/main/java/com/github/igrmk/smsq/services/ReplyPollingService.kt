@@ -113,7 +113,7 @@ class ReplyPollingService : Service() {
                 for (command in messages) {
                     // No automatic SMS retry: a reply claimed by the backend
                     // cannot be fetched a second time.
-                    val accepted = submitSMS(command)
+                    val accepted = submitSMS(command, key)
                     rememberAcknowledgement(command.id, accepted)
                 }
                 flushAcknowledgements(key)
@@ -126,7 +126,12 @@ class ReplyPollingService : Service() {
         }
     }
 
-    private fun submitSMS(command: PendingReply): Boolean {
+    private fun submitSMS(command: PendingReply, expectedKey: String): Boolean {
+        // Revocation or disabling replies must take effect even if the
+        // backend response arrived while the user was changing settings.
+        if (!canPoll() || myPreferences.key != expectedKey) {
+            return false
+        }
         if (!SMS_NUMBER.matches(command.recipient) ||
             command.text.isBlank() || command.text.toByteArray(Charsets.UTF_8).size > 1600 ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
