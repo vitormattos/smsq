@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.ContactsContract
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Telephony
@@ -11,6 +13,7 @@ import android.telephony.SmsMessage
 import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.github.igrmk.smsq.entities.Sms
 import com.github.igrmk.smsq.services.ResenderService
 import java.util.*
@@ -28,6 +31,23 @@ class SmsReceiver : BroadcastReceiver() {
             return subscriptionManager.getActiveSubscriptionInfoForSimSlotIndex(slot)
         }
         return null
+    }
+
+    private fun contactName(context: Context, address: String): String {
+        if (!context.myPreferences.showContacts ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            return ""
+        }
+        val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(address))
+        return try {
+            context.contentResolver.query(
+                uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) ?: "" else ""
+            } ?: ""
+        } catch (e: SecurityException) {
+            ""
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -75,6 +95,7 @@ class SmsReceiver : BroadcastReceiver() {
             this.carrier = carrierName
             this.text = text
             this.sender = address
+            this.contactName = contactName(context, address)
             this.timestamp = timestamp / 1000
             this.offset = offset / 1000
         }

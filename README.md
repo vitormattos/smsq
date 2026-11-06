@@ -120,6 +120,61 @@ Usage
 Bot: `sms_j_bot`<br/>
 Backend URL: `https://smsq.jora.wtf/`
 
+
+## Reply to SMS from Telegram
+
+This is an **opt-in** feature and requires updating **both** the self-hosted
+backend and the Android application. It is disabled by default.
+
+1. Configure an **HTTPS** backend URL, pair the phone with your Telegram bot and start SMS forwarding.
+2. Enable **Allow SMS replies** in the Android application and grant the Android
+   \`SEND_SMS\` permission. The application will display an ongoing notification
+   while its foreground service checks the backend approximately once a minute.
+3. In Telegram, use **Reply** on a forwarded SMS message and type your response.
+   The bot queues the text for the number that sent that specific SMS. It cannot
+   be redirected by editing the quoted message or typing a different number.
+4. The bot first confirms that the reply was queued, then reports whether Android
+   accepted the submission to the SMS subsystem. This **does not confirm carrier
+   delivery**. Mobile operator SMS fees may apply.
+
+Only the paired user can reply in a private chat. When \`GROUP_ID\` is configured,
+**only the Telegram account identified by \`ADMIN_ID\`** may initiate SMS replies
+from that group. Other group members cannot send SMS. Replies to unrelated bot
+messages, expired forwarded messages (older than seven days), invalid/short-code
+senders and empty messages are ignored or rejected. A phone can queue up to 30
+outgoing replies per 24 hours. Reply text has a 1,600-byte limit.
+
+For safety, an outgoing command is handed out to the phone **at most once**.
+If the connection is lost during that hand-off, the SMS might not be sent;
+the system does not automatically send it again. The phone stores acknowledgements
+locally to retry reporting submission status without resending the SMS.
+
+The background service runs only while forwarding and SMS replies are enabled.
+Modern Android battery management may delay the one-minute checks; there is no
+instant-push guarantee. The Android SMS subsystem uses the phone's **default
+outgoing SIM**; with multiple SIMs, check the default before enabling this feature.
+
+## Show contact names
+
+Enable **Show contact names** and grant \`READ_CONTACTS\`. If the sender's
+number matches an entry in the phone's address book, a forwarded message shows
+\`Contact name (+15551234567)\` instead of just the number. The original
+sender number remains visible, and contacts without a match still show only
+their number. This switch is independent of enabling SMS replies.
+
+### Release and upgrade notes
+
+- Deploy the updated backend first. Its SQLite schema migration creates
+  short-lived forwarding references and outgoing SMS command records.
+- Install the updated Android app (v1.7.0 / version code 17), open it and
+  explicitly grant the new permissions. Existing queued incoming SMS are
+  preserved by a database migration.
+- There are no new backend environment variables; existing \`DOMAIN\`,
+  \`BOT_TOKEN\`, \`ADMIN_ID\`, and optional \`GROUP_ID\` are used.
+- The previous Android app remains able to forward incoming SMS. Its users
+  do not gain the SMS sending capability without installing and opting in
+  to the new version.
+
 Privacy policy
 --------------
 __[PRIVACY POLICY](PRIVACY.md)__

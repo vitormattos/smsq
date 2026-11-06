@@ -30,7 +30,7 @@ class RestTalker(val logger: Logger, private val baseUrl: String, private val hy
             return Pair(null, false)
         }
         if (error == null) {
-            logger.linf(tag, "got response: '$data'")
+            logger.linf(tag, "got successful response")
         }
         if (error != null) {
             logger.linf(tag, "got error: $error")
@@ -58,6 +58,35 @@ class RestTalker(val logger: Logger, private val baseUrl: String, private val hy
                 .timeoutRead(Constants.SOCKET_TIMEOUT_MS)
                 .responseString()
         return checkErrors(SmsResponse.serializer(), req.url, result)
+    }
+
+    fun pollReplies(key: String): List<PendingReply>? {
+        val payload = ReplyPollRequest().apply { this.key = key }
+        val (req, _, result) = Fuel
+                .post(baseUrl.trimEnd('/') + "/v1/replies/poll")
+                .body(body(ReplyPollRequest.serializer(), payload))
+                .header("Content-Type" to "application/json")
+                .timeout(Constants.SOCKET_TIMEOUT_MS)
+                .timeoutRead(Constants.SOCKET_TIMEOUT_MS)
+                .responseString()
+        return checkErrors(ReplyPollResponse.serializer(), req.url, result).first
+    }
+
+    fun ackReply(key: String, id: Long, success: Boolean): Boolean {
+        val payload = ReplyAckRequest().apply {
+            this.key = key
+            this.id = id
+            this.success = success
+        }
+        val (req, _, result) = Fuel
+                .post(baseUrl.trimEnd('/') + "/v1/replies/ack")
+                .body(body(ReplyAckRequest.serializer(), payload))
+                .header("Content-Type" to "application/json")
+                .timeout(Constants.SOCKET_TIMEOUT_MS)
+                .timeoutRead(Constants.SOCKET_TIMEOUT_MS)
+                .responseString()
+        val (ack, ok) = checkErrors(ReplyAckResponse.serializer(), req.url, result)
+        return ok && ack == "ok"
     }
 
     private fun <T> body(serializer: SerializationStrategy<T>, data: T): String {

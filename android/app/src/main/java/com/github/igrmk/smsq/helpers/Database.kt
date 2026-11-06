@@ -14,6 +14,7 @@ class DbHelper(ctx: Context) : ManagedSQLiteOpenHelper(ctx, "database", version 
         const val COLUMN_SMS_ID = "id"
         const val COLUMN_SMS_TEXT = "text"
         const val COLUMN_SMS_SENDER = "sender"
+        const val COLUMN_SMS_CONTACT_NAME = "contact_name"
         const val COLUMN_SMS_CARRIER = "carrier"
         const val COLUMN_SMS_SIM = "sim"
         const val COLUMN_SMS_TIMESTAMP = "timestamp"
@@ -35,6 +36,7 @@ class DbHelper(ctx: Context) : ManagedSQLiteOpenHelper(ctx, "database", version 
                 COLUMN_SMS_ID to INTEGER + PRIMARY_KEY + AUTOINCREMENT,
                 COLUMN_SMS_TEXT to TEXT,
                 COLUMN_SMS_SENDER to TEXT,
+                COLUMN_SMS_CONTACT_NAME to TEXT,
                 COLUMN_SMS_CARRIER to TEXT,
                 COLUMN_SMS_SIM to TEXT,
                 COLUMN_SMS_TIMESTAMP to INTEGER,
@@ -43,7 +45,9 @@ class DbHelper(ctx: Context) : ManagedSQLiteOpenHelper(ctx, "database", version 
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        onCreate(db)
+        if (oldVersion < 17) {
+            db.execSQL("ALTER TABLE sms ADD COLUMN contact_name TEXT NOT NULL DEFAULT ''")
+        }
     }
 }
 
@@ -55,6 +59,7 @@ fun Context.storeSms(sms: Sms) {
         insert(DbHelper.TABLE_SMS,
                 DbHelper.COLUMN_SMS_TEXT to sms.text,
                 DbHelper.COLUMN_SMS_SENDER to sms.sender,
+                DbHelper.COLUMN_SMS_CONTACT_NAME to sms.contactName,
                 DbHelper.COLUMN_SMS_CARRIER to sms.carrier,
                 DbHelper.COLUMN_SMS_SIM to sms.sim,
                 DbHelper.COLUMN_SMS_TIMESTAMP to sms.timestamp,
@@ -70,6 +75,7 @@ fun Context.allSmses(): List<Sms> {
                 DbHelper.COLUMN_SMS_ID,
                 DbHelper.COLUMN_SMS_TEXT,
                 DbHelper.COLUMN_SMS_SENDER,
+                DbHelper.COLUMN_SMS_CONTACT_NAME,
                 DbHelper.COLUMN_SMS_CARRIER,
                 DbHelper.COLUMN_SMS_SIM,
                 DbHelper.COLUMN_SMS_TIMESTAMP,
@@ -79,6 +85,7 @@ fun Context.allSmses(): List<Sms> {
                 .parseList(rowParser { id: Int,
                                        text: String,
                                        sender: String,
+                                       contactName: String,
                                        carrier: String,
                                        sim: String,
                                        timestamp: Long,
@@ -87,6 +94,7 @@ fun Context.allSmses(): List<Sms> {
                         this.id = id
                         this.text = text
                         this.sender = sender
+                        this.contactName = contactName
                         this.carrier = carrier
                         this.sim = sim
                         this.timestamp = timestamp

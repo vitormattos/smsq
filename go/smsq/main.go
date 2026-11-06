@@ -46,6 +46,7 @@ type sms struct {
 	SIM       string `json:"sim"`
 	Carrier   string `json:"carrier"`
 	Sender    string `json:"sender"`
+	ContactName string `json:"contactName"`
 	Timestamp int64  `json:"timestamp"`
 	Offset    int    `json:"offset"`
 }
@@ -92,6 +93,7 @@ func newWorker() *worker {
 	checkErr(err)
 	db, err := sql.Open("sqlite3", cfg.DBPath)
 	checkErr(err)
+	db.SetMaxOpenConns(1)
 	decryptor, err := hybrid.NewHybridDecrypt(cfg.privateKey)
 	checkErr(err)
 	w := &worker{
@@ -128,7 +130,10 @@ func (r deliveryResult) String() string {
 }
 
 func (w *worker) logConfig() {
-	cfgString, err := json.MarshalIndent(w.cfg, "", "    ")
+	safe := *w.cfg
+	safe.BotToken = "[redacted]"
+	safe.PrivateKey = "[redacted]"
+	cfgString, err := json.MarshalIndent(safe, "", "    ")
 	checkErr(err)
 	linf("config: " + string(cfgString))
 }
@@ -407,6 +412,8 @@ func (w *worker) processTGUpdate(u tg.Update) {
 					break
 				}
 			}
+		} else if !u.Message.IsCommand() && u.Message.ReplyToMessage != nil {
+			w.handleTelegramReply(u.Message)
 		} else if u.Message.IsCommand() {
 			if u.Message.Chat.Type != "private" {
 				_ = w.sendText(u.Message.Chat.ID, false, parseRaw, onlyInAPrivateChat)
@@ -470,20 +477,26 @@ func (w *worker) sendText(chatID int64, notify bool, parse parseKind, text strin
 }
 
 func (w *worker) send(msg baseChattable) error {
-	if _, err := w.bot.Send(msg); err != nil {
+	_, err := w.sendAndGet(msg)
+	return err
+}
+
+func (w *worker) sendAndGet(msg baseChattable) (tg.Message, error) {
+	result, err := w.bot.Send(msg)
+	if err != nil {
 		switch err := err.(type) {
 		case tg.Error:
 			if err.Code == 403 {
 				linf("bot is blocked by the user %d, %v", msg.baseChat().ChatID, err)
-				return errBlockedByUser
+				return result, errBlockedByUser
 			}
 			lerr("cannot send a message to %d, code %d, %v", msg.baseChat().ChatID, err.Code, err)
 		default:
 			lerr("unexpected error type while sending a message to %d, %v", msg.baseChat().ChatID, err)
 		}
-		return err
+		return result, err
 	}
-	return nil
+	return result, nil
 }
 
 func (w *worker) handleRetired(writer http.ResponseWriter, r *http.Request) {
@@ -564,6 +577,8 @@ func (w *worker) apiReply(writer http.ResponseWriter, result deliveryResult) {
 func (w *worker) handleEndpoints() {
 	http.HandleFunc("/v0/sms", w.handleRetired)
 	http.HandleFunc("/v1/sms", w.handleV1SMS)
+	http.HandleFunc("/v1/replies/poll", w.handleReplyPoll)
+	http.HandleFunc("/v1/replies/ack", w.handleReplyAck)
 }
 
 func (w *worker) deliver(sms sms) deliveryResult {
@@ -597,6 +612,9 @@ func (w *worker) deliver(sms sms) deliveryResult {
 	tm := time.Unix(sms.Timestamp, 0).In(loc)
 	lines = append(lines, tm.Format("2006-01-02 15:04:05"))
 	var sender = html.EscapeString(sms.Sender)
+	if sms.ContactName != "" {
+		sender = html.EscapeString(sms.ContactName) + " (" + sender + ")"
+	}
 	var sim = html.EscapeString(sms.SIM)
 	if sim == "" {
 		sim = html.EscapeString(sms.Carrier)
@@ -620,13 +638,21 @@ func (w *worker) deliver(sms sms) deliveryResult {
 		targetChatID = w.cfg.GroupID
 	}
 
-	if err := w.sendText(targetChatID, true, parseHTML, text); err != nil {
+	forwarded := tg.NewMessage(targetChatID, text)
+	forwarded.ParseMode = parseHTML.String()
+	message, err := w.sendAndGet(&messageConfig{forwarded})
+	if err != nil {
 		switch err {
 		case errBlockedByUser:
 			return blocked
 		default:
 			return networkError
 		}
+	}
+	if recipient, ok := normalizeRecipient(sms.Sender); ok {
+		w.mustExec("insert or replace into forwarded_sms "+
+			"(telegram_chat_id, telegram_message_id, owner_chat_id, key_hash, recipient, created_at) values (?, ?, ?, ?, ?, ?)",
+			targetChatID, message.MessageID, *chatID, keyFingerprint(sms.Key), recipient, time.Now().Unix())
 	}
 	w.mustExec("update users set delivered=delivered+1, delivered_today=delivered_today+1 where chat_id=?", chatID)
 	return delivered
@@ -648,6 +674,7 @@ func (w *worker) periodic() {
 	if m := midnight(); m > w.storedMidnight() {
 		w.storeMidnight(m)
 		w.mustExec("update users set delivered_today=0, received_today=0")
+		w.cleanupReplies()
 	}
 }
 

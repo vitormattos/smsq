@@ -14,6 +14,9 @@ object Constants {
     const val PREF_KEY = "key"
     const val PREF_ON = "on"
     const val PREF_CARRIER = "show_carrier"
+    const val PREF_CONTACTS = "show_contacts"
+    const val PREF_SMS_REPLIES = "allow_sms_replies"
+    const val PREF_REPLY_ACKS = "pending_reply_acks"
     const val PREF_CONSENT = "consent"
     const val PREF_RETIRED = "retired"
     const val PREF_VERSION_CODE = "version_code"
@@ -23,6 +26,8 @@ object Constants {
     const val KEY_LENGTH = 64
     const val PERMISSIONS_SMS = 1
     const val PERMISSIONS_STATE = 2
+    const val PERMISSIONS_CONTACTS = 3
+    const val PERMISSIONS_SEND_SMS = 4
 
     @Suppress("SpellCheckingInspection")
     const val RELEASE_PUBLIC_KEY_STRING = """

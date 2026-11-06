@@ -71,6 +71,31 @@
         android:width="200dp"
         android:onClick="onCarrierClicked"
         android:text="@string/show_carrier"
+        app:layout_constraintBottom_toTopOf="@id/showContacts"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/showContacts"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:width="240dp"
+        android:onClick="onContactsClicked"
+        android:text="@string/show_contacts"
+        app:layout_constraintBottom_toTopOf="@id/enableSmsReplies"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/enableSmsReplies"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:width="240dp"
+        android:enabled="false"
+        android:onClick="onRepliesClicked"
+        android:text="@string/allow_sms_replies"
         app:layout_constraintBottom_toTopOf="@id/delivered_layout"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent" />

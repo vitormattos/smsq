@@ -70,3 +70,17 @@ var SharedPreferences.botName: String
         apply()
     }
 
+
+var SharedPreferences.showContacts: Boolean
+    get() = getBoolean(Constants.PREF_CONTACTS, false)
+    set(value) = with(edit()) {
+        putBoolean(Constants.PREF_CONTACTS, value)
+        apply()
+    }
+
+var SharedPreferences.replyEnabled: Boolean
+    get() = getBoolean(Constants.PREF_SMS_REPLIES, false)
+    set(value) = with(edit()) {
+        putBoolean(Constants.PREF_SMS_REPLIES, value)
+        apply()
+    }

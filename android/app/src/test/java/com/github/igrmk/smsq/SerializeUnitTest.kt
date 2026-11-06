@@ -18,6 +18,18 @@ class SerializeUnitTest {
     })
 
     @Test
+    fun contactNameIsSerializedWithForwardedSMS() {
+        val sms = com.github.igrmk.smsq.entities.Sms().apply {
+            sender = "+15551234567"
+            contactName = "Example Contact"
+            text = "hello"
+        }
+        val payload = json.stringify(com.github.igrmk.smsq.entities.Sms.serializer(), sms)
+        assertTrue(payload.contains("\"contactName\":\"Example Contact\""))
+        assertTrue(payload.contains("\"sender\":\"+15551234567\""))
+    }
+
+    @Test
     fun serializeCorrect() {
         assertEquals(""""delivered"""", json.stringify(DeliveryResultSerializer, DeliveryResult.Delivered))
     }
